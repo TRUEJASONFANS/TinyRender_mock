@@ -1,8 +1,9 @@
 #include <vector>
-#include <cmath>
-#include "tgaimage.h"
+
+#include "tinyrender/tgaimage.h"
 #include "model.h"
-#include "geometry.h"
+#include "tinyrender/geometry.h"
+#include "tinyrender/render.h"
 
 const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red   = TGAColor(255, 0,   0,   255);
@@ -10,28 +11,7 @@ Model *model = NULL;
 const int width  = 800;
 const int height = 800;
 
-void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
-    bool steep = false;
-    if (std::abs(x0-x1)<std::abs(y0-y1)) {
-        std::swap(x0, y0);
-        std::swap(x1, y1);
-        steep = true;
-    }
-    if (x0>x1) {
-        std::swap(x0, x1);
-        std::swap(y0, y1);
-    }
 
-    for (int x=x0; x<=x1; x++) {
-        float t = (x-x0)/(float)(x1-x0);
-        int y = y0*(1.-t) + y1*t;
-        if (steep) {
-            image.set(y, x, color);
-        } else {
-            image.set(x, y, color);
-        }
-    }
-}
 
 int main(int argc, char** argv) {
     if (2==argc) {
@@ -41,16 +21,22 @@ int main(int argc, char** argv) {
     }
 
     TGAImage image(width, height, TGAImage::RGB);
+    Vec3f light_dir(0,0,-1); // define light_dir
+
     for (int i=0; i<model->nfaces(); i++) {
         std::vector<int> face = model->face(i);
+        Vec2i screen_coords[3];
+        Vec3f world_coords[3];
         for (int j=0; j<3; j++) {
-            Vec3f v0 = model->vert(face[j]);
-            Vec3f v1 = model->vert(face[(j+1)%3]);
-            int x0 = (v0.x+1.)*width/2.;
-            int y0 = (v0.y+1.)*height/2.;
-            int x1 = (v1.x+1.)*width/2.;
-            int y1 = (v1.y+1.)*height/2.;
-            line(x0, y0, x1, y1, image, white);
+            Vec3f v = model->vert(face[j]);
+            screen_coords[j] = Vec2i((v.x+1.)*width/2., (v.y+1.)*height/2.);
+            world_coords[j]  = v;
+        }
+        Vec3f n = (world_coords[2]-world_coords[0])^(world_coords[1]-world_coords[0]);
+        n.normalize();
+        float intensity = n*light_dir;
+        if (intensity>0) {
+            triangle(screen_coords, image, TGAColor(intensity*255, intensity*255, intensity*255, 255));
         }
     }
 
