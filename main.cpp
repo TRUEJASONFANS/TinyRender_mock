@@ -3,12 +3,35 @@
 #include "tgaimage.h"
 #include "model.h"
 #include "geometry.h"
+#include "myopengl.h"
 
 const TGAColor white = TGAColor(255, 255, 255, 255);
 const TGAColor red   = TGAColor(255, 0,   0,   255);
 Model *model = NULL;
 const int width  = 800;
 const int height = 800;
+
+Vec3f light_dir(1,1,1);
+Vec3f       eye(1,1,3);
+Vec3f    center(0,0,0);
+Vec3f        up(0,1,0);
+
+class GouraudSharder : public IShader {
+public:
+    Vec3f varying_intensity; // written by vertex shader, read by fragment shader
+    ~GouraudSharder() override {
+
+    }
+
+    Vec3f vertex(int iface, int nthvert) override {
+        varying_intensity[nthvert] = std::max(0.f, model->normal(iface, nthvert)*light_dir); // get diffuse lighting intensity
+
+    }
+
+    bool fragment(Vec3f bar, TGAColor &color) override {
+        return false;
+    }
+};
 
 void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
     bool steep = false;
@@ -37,8 +60,9 @@ int main(int argc, char** argv) {
     if (2==argc) {
         model = new Model(argv[1]);
     } else {
-        model = new Model("H:\\Githup\\tinyrender_mock\\obj\\african_head.obj");
+        model = new Model("C:\\Users\\zhxie\\workspace\\github\\TinyRender_mock\\obj\\african_head.obj");
     }
+    GouraudSharder sharder;
 
     TGAImage image(width, height, TGAImage::RGB);
     for (int i=0; i<model->nfaces(); i++) {
