@@ -38,34 +38,12 @@ public:
     }
 };
 
-void line(int x0, int y0, int x1, int y1, TGAImage &image, TGAColor color) {
-    bool steep = false;
-    if (std::abs(x0-x1)<std::abs(y0-y1)) {
-        std::swap(x0, y0);
-        std::swap(x1, y1);
-        steep = true;
-    }
-    if (x0>x1) {
-        std::swap(x0, x1);
-        std::swap(y0, y1);
-    }
-
-    for (int x=x0; x<=x1; x++) {
-        float t = (x-x0)/(float)(x1-x0);
-        int y = y0*(1.-t) + y1*t;
-        if (steep) {
-            image.set(y, x, color);
-        } else {
-            image.set(x, y, color);
-        }
-    }
-}
 
 int main(int argc, char** argv) {
     if (2==argc) {
         model = new Model(argv[1]);
     } else {
-        model = new Model("C:\\Users\\zhxie\\workspace\\github\\TinyRender_mock\\obj\\african_head.obj");
+        model = new Model("H:\\Githup\\tinyrender_mock\\obj\\african_head.obj");
     }
 
     lookat(eye, center, up);
@@ -92,7 +70,7 @@ int main(int argc, char** argv) {
 
     image.flip_vertically(); // i want to have the origin at the left bottom corner of the
     zbuffer.flip_vertically();
-    image. write_tga_file("output.tga");
+    image.write_tga_file("output.tga");
     zbuffer.write_tga_file("zbuffer.tga");
 
 

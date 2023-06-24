@@ -45,6 +45,33 @@ void lookat(Vec3f eye, Vec3f center, Vec3f up) {
 
 }
 
+/**
+ *
+ * Xc - Xa, Xb - Xa, Xa - Xp
+ * Yc - Ya, Yb - Ya, Ya - Yp
+ * Zc - Za, Zb - Za, Za - Zp
+ *
+ * @param A
+ * @param B
+ * @param C
+ * @param P
+ * @return
+ */
+
+
+Vec3f barycentric(Vec3i A, Vec3i B, Vec3i C, Vec3i P) {
+    Vec3i s[2];
+    for (int i=2; i--; ) {
+        s[i][0] = C[i]-A[i];
+        s[i][1] = B[i]-A[i];
+        s[i][2] = A[i]-P[i];
+    }
+    Vec3f u = cross(s[0], s[1]);
+    if (std::abs(u[2])>1e-2) // dont forget that u[2] is integer. If it is zero then triangle ABC is degenerate
+        return Vec3f(1.f-(u.x+u.y)/u.z, u.y/u.z, u.x/u.z);
+    return Vec3f(-1,1,1); // in this case generate negative coordinates, it will be thrown away by the rasterizator
+}
+
 void triangle(Vec3i *pts, IShader &shader, TGAImage &image, TGAImage &zbuffer) {
     Vec2i bboxmin(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
     Vec2i bboxmax(-std::numeric_limits<int>::max(), -std::numeric_limits<int>::max());
@@ -60,47 +87,21 @@ void triangle(Vec3i *pts, IShader &shader, TGAImage &image, TGAImage &zbuffer) {
     Vec3i P;
     TGAColor color;
     for (P.x = bboxmin.x ; P.x <= bboxmax.x; P.x++) {
-        for (P.y = bboxmin.y ; P.y <= bboxmin.y; P.y++) {
-
+        for (P.y = bboxmin.y ; P.y <= bboxmax.y; P.y++) {
             // 求出p点的重心坐标
             Vec3f c = barycentric(pts[0], pts[1], pts[2], P);
             P.z = std::max(0, std::min(255, int(pts[0].z*c.x + pts[1].z*c.y + pts[2].z*c.z + .5))); // clamping to 0-255 since it is stored in unsigned char
-            if (c.x<0 || c.y<0 || c.z<0 || zbuffer.get(P.x, P.y)[0]>P.z) continue;
+
+            if (c.x < 0 || c.y < 0 || c.z < 0 || zbuffer.get(P.x, P.y)[0] > P.z) continue;
+
             bool discard = shader.fragment(c, color);
             if (!discard) {
                 zbuffer.set(P.x, P.y, TGAColor(P.z));
                 image.set(P.x, P.y, color);
             }
-
         }
     }
 }
 
-/**
- *
- * Xc - Xa, Xb - Xa, Xa - Xp
- * Yc - Ya, Yb - Ya, Ya - Yp
- * Zc - Za, Zb - Za, Za - Zp
- *
- * @param A
- * @param B
- * @param C
- * @param P
- * @return
- */
-
-
-Vec3f   barycentric(Vec3i A, Vec3i B, Vec3i C, Vec3i P) {
-    Vec3i s[2];
-    for (int i=2; i--; ) {
-        s[i][0] = C[i]-A[i];
-        s[i][1] = B[i]-A[i];
-        s[i][2] = A[i]-P[i];
-    }
-    Vec3f u = cross(s[0], s[1]);
-    if (std::abs(u[2])>1e-2) // dont forget that u[2] is integer. If it is zero then triangle ABC is degenerate
-        return Vec3f(1.f-(u.x+u.y)/u.z, u.y/u.z, u.x/u.z);
-    return Vec3f(-1,1,1); // in this case generate negative coordinates, it will be thrown away by the rasterizator
-}
 
 IShader::~IShader() {};
