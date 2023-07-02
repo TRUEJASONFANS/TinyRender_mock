@@ -19,9 +19,11 @@ Vec3f        up(0,1,0);
 class GouraudSharder : public IShader {
 public:
     Vec3f varying_intensity; // written by vertex shader, read by fragment shader
+    mat<2,3,float> varying_uv;        // same as above
 
     Vec3f vertex(int iface, int nthvert) override {
         Vec4f gl_Vertex = embed<4>(model->vert(iface, nthvert)); // read the vertex from .obj file
+        varying_uv.set_col(nthvert, model->uv(iface, nthvert));
         gl_Vertex = Viewport * Projection * ModelView * gl_Vertex;
         varying_intensity[nthvert] = std::max(0.f, model->normal(iface, nthvert)*light_dir); // get diffuse lighting intensity
         return proj<3>(gl_Vertex/gl_Vertex[3]);
@@ -29,7 +31,8 @@ public:
 
     bool fragment(Vec3f bar, TGAColor &color) override {
         float intensity = varying_intensity*bar;   // interpolate intensity for the current pixel
-        color = TGAColor(255, 255, 255)*intensity; // well duh
+        auto uv = varying_uv*bar;   // interpolate intensity for the current pixel
+        color = model->diffuse(uv)*intensity; // well duh
         return false;
     }
 
