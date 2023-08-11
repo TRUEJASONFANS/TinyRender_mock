@@ -46,7 +46,7 @@ int main(int argc, char** argv) {
     if (2==argc) {
         model = new Model(argv[1]);
     } else {
-        model = new Model("H:\\Githup\\tinyrender_mock\\obj\\african_head.obj");
+        model = new Model("african_head.obj");
     }
 
     lookat(eye, center, up);
