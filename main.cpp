@@ -21,12 +21,12 @@ public:
     Vec3f varying_intensity; // written by vertex shader, read by fragment shader
     mat<2,3,float> varying_uv;        // same as above
 
-    Vec3f vertex(int iface, int nthvert) override {
+    Vec4f vertex(int iface, int nthvert) override {
         Vec4f gl_Vertex = embed<4>(model->vert(iface, nthvert)); // read the vertex from .obj file
         varying_uv.set_col(nthvert, model->uv(iface, nthvert));
         gl_Vertex = Viewport * Projection * ModelView * gl_Vertex;
         varying_intensity[nthvert] = std::max(0.f, model->normal(iface, nthvert)*light_dir); // get diffuse lighting intensity
-        return proj<3>(gl_Vertex/gl_Vertex[3]);
+        return proj<4>(gl_Vertex/gl_Vertex[3]);
     }
 
     bool fragment(Vec3f bar, TGAColor &color) override {
@@ -41,6 +41,28 @@ public:
     }
 };
 
+class DepthShader : public IShader {
+    mat<3,3,float> varying_tri;
+    public :
+    DepthShader() : varying_tri() {}
+
+    virtual Vec4f vertex(int iface, int nthvert) {
+        Vec4f gl_Vertex = embed<4>(model->vert(iface, nthvert)); // read the vertex from .obj file
+        gl_Vertex = Viewport*Projection*ModelView*gl_Vertex;          // transform it to screen coordinates
+        varying_tri.set_col(nthvert, proj<3>(gl_Vertex/gl_Vertex[3]));
+        return gl_Vertex;
+    }
+
+    virtual bool fragment(Vec3f bar, TGAColor &color) {
+        Vec3f p = varying_tri*bar;
+        color = TGAColor(255, 255, 255)*(p.z/depth);
+        return false;
+    }
+    ~DepthShader() override {
+
+    }
+};
+
 
 int main(int argc, char** argv) {
     if (2==argc) {
@@ -49,34 +71,36 @@ int main(int argc, char** argv) {
         model = new Model("african_head.obj");
     }
 
-    lookat(eye, center, up);
-    viewport(width/8, height/8, width*3/4, height*3/4);
-    projection(-1.f/(eye-center).norm());
     light_dir.normalize();
 
 
+    Matrix M = Viewport*Projection*ModelView;
+
     TGAImage image(width, height, TGAImage::RGB);
-    TGAImage zbuffer(width, height, TGAImage::GRAYSCALE);
-    GouraudSharder shader;
+    float *zbuffer = new float[width*height];
+    float *shadowbuffer  = new float[width*height];
 
+    {
+        TGAImage depth(width, height, TGAImage::RGB);
+        lookat(eye, center, up);
+        viewport(width/8, height/8, width*3/4, height*3/4);
+        projection(-1.f/(eye-center).norm());
 
-    for (int i=0; i<model->nfaces(); i++) {
-        std::vector<int> face = model->face(i);
-        for (int j=0; j<3; j++) {
-            Vec3i screen_coords[3];
+        DepthShader depthshader;
+        Vec4f screen_coords[3];
+        for (int i=0; i<model->nfaces(); i++) {
             for (int j=0; j<3; j++) {
-                screen_coords[j] = shader.vertex(i, j);
+                screen_coords[j] = depthshader.vertex(i, j);
             }
-            triangle(screen_coords, shader, image, zbuffer);
+            triangle(screen_coords, depthshader, depth, shadowbuffer);
         }
+        depth.flip_vertically(); // to place the origin in the bottom left corner of the image
+        depth.write_tga_file("depth.tga");
     }
-
-    image.flip_vertically(); // i want to have the origin at the left bottom corner of the
-    zbuffer.flip_vertically();
-    image.write_tga_file("output.tga");
-    zbuffer.write_tga_file("zbuffer.tga");
 
 
     delete model;
+    delete [] zbuffer;
+    delete [] shadowbuffer;
     return 0;
 }
